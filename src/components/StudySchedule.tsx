@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, AlertCircle, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface DeadlineItem {
   id: string;
@@ -17,7 +18,9 @@ interface DeadlineItem {
 
 const StudySchedule = () => {
   const { toast } = useToast();
-  const [deadlines, setDeadlines] = useState<DeadlineItem[]>([
+  
+  // Persistent deadlines storage
+  const [deadlines, setDeadlines] = useLocalStorage<DeadlineItem[]>('studyDeadlines', [
     {
       id: '1',
       title: 'Math Assignment Chapter 5',

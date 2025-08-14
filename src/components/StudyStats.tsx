@@ -5,23 +5,57 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Target, Flame, Clock, TrendingUp } from 'lucide-react';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface StudyData {
   dailyGoal: number;
   sessionsToday: number;
   currentStreak: number;
   totalMinutes: number;
+  lastStudyDate: string;
 }
 
 const StudyStats = () => {
-  const [stats, setStats] = useState<StudyData>({
+  // Get today's date
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Persistent study data
+  const [stats, setStats] = useLocalStorage<StudyData>('studyData', {
     dailyGoal: 4,
-    sessionsToday: 2,
-    currentStreak: 5,
-    totalMinutes: 50
+    sessionsToday: 0,
+    currentStreak: 0,
+    totalMinutes: 0,
+    lastStudyDate: ''
+  });
+
+  // Get study stats from timer component
+  const [studyStats] = useLocalStorage('studyStats', {
+    totalSessions: 0,
+    totalMinutes: 0,
+    currentStreak: 0,
+    lastStudyDate: ''
   });
 
   const [newGoal, setNewGoal] = useState(stats.dailyGoal.toString());
+
+  // Update today's session count based on study stats
+  useEffect(() => {
+    if (studyStats.lastStudyDate === today) {
+      setStats(prev => ({
+        ...prev,
+        sessionsToday: studyStats.totalSessions - (prev.sessionsToday || 0) + (prev.sessionsToday || 0),
+        currentStreak: studyStats.currentStreak,
+        totalMinutes: studyStats.totalMinutes
+      }));
+    } else {
+      // Reset daily count if it's a new day
+      setStats(prev => ({
+        ...prev,
+        sessionsToday: 0,
+        lastStudyDate: today
+      }));
+    }
+  }, [studyStats, today, setStats]);
 
   const updateGoal = () => {
     const goal = parseInt(newGoal);
@@ -30,8 +64,9 @@ const StudyStats = () => {
     }
   };
 
-  const progressPercentage = Math.min((stats.sessionsToday / stats.dailyGoal) * 100, 100);
-  const isGoalReached = stats.sessionsToday >= stats.dailyGoal;
+  // Calculate progress based on real session data
+  const progressPercentage = Math.min((studyStats.totalSessions / stats.dailyGoal) * 100, 100);
+  const isGoalReached = studyStats.totalSessions >= stats.dailyGoal;
 
   return (
     <div className="space-y-6">
@@ -47,7 +82,7 @@ const StudyStats = () => {
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Progress</span>
               <span className="font-medium">
-                {stats.sessionsToday} / {stats.dailyGoal} sessions
+                {studyStats.totalSessions} / {stats.dailyGoal} sessions
               </span>
             </div>
             
@@ -99,7 +134,7 @@ const StudyStats = () => {
               <Flame className="w-5 h-5 text-accent" />
             </div>
             <div className="text-2xl font-bold text-foreground">
-              {stats.currentStreak}
+              {studyStats.currentStreak}
             </div>
             <div className="text-sm text-muted-foreground">
               Day Streak
@@ -113,10 +148,10 @@ const StudyStats = () => {
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <div className="text-2xl font-bold text-foreground">
-              {stats.totalMinutes}
+              {studyStats.totalMinutes}
             </div>
             <div className="text-sm text-muted-foreground">
-              Minutes Today
+              Total Minutes
             </div>
           </div>
         </Card>
@@ -127,10 +162,10 @@ const StudyStats = () => {
               <TrendingUp className="w-5 h-5 text-success" />
             </div>
             <div className="text-2xl font-bold text-foreground">
-              {stats.sessionsToday}
+              {studyStats.totalSessions}
             </div>
             <div className="text-sm text-muted-foreground">
-              Sessions Done
+              Total Sessions
             </div>
           </div>
         </Card>

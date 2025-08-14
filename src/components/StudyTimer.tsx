@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Play, Pause, RotateCcw, Coffee } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface TimerState {
   minutes: number;
@@ -12,14 +13,31 @@ interface TimerState {
   sessionCount: number;
 }
 
+interface StudyStats {
+  totalSessions: number;
+  totalMinutes: number;
+  currentStreak: number;
+  lastStudyDate: string;
+}
+
 const StudyTimer = () => {
   const { toast } = useToast();
-  const [timer, setTimer] = useState<TimerState>({
+  
+  // Persistent timer state
+  const [timer, setTimer] = useLocalStorage<TimerState>('studyTimer', {
     minutes: 25,
     seconds: 0,
     isActive: false,
     isBreak: false,
     sessionCount: 0
+  });
+
+  // Persistent study stats
+  const [studyStats, setStudyStats] = useLocalStorage<StudyStats>('studyStats', {
+    totalSessions: 0,
+    totalMinutes: 0,
+    currentStreak: 0,
+    lastStudyDate: ''
   });
 
   const formatTime = (mins: number, secs: number) => {
@@ -41,6 +59,8 @@ const StudyTimer = () => {
 
   const switchMode = () => {
     const newIsBreak = !timer.isBreak;
+    const today = new Date().toISOString().split('T')[0];
+    
     setTimer(prev => ({
       ...prev,
       isBreak: newIsBreak,
@@ -50,9 +70,22 @@ const StudyTimer = () => {
       sessionCount: newIsBreak ? prev.sessionCount : prev.sessionCount + 1
     }));
 
+    // Update study stats when completing a focus session
+    if (newIsBreak) {
+      setStudyStats(prev => {
+        const isNewDay = prev.lastStudyDate !== today;
+        return {
+          totalSessions: prev.totalSessions + 1,
+          totalMinutes: prev.totalMinutes + 25,
+          currentStreak: isNewDay ? (prev.currentStreak + 1) : prev.currentStreak,
+          lastStudyDate: today
+        };
+      });
+    }
+
     toast({
-      title: newIsBreak ? "Break Time! ☕" : "Back to Work! 📚",
-      description: newIsBreak ? "Take a well-deserved break" : "Ready for another focused session",
+      title: newIsBreak ? "Session Complete! 🎉" : "Break Over! 💪",
+      description: newIsBreak ? "Great focus session! Take a break." : "Ready for another focused session",
     });
   };
 
@@ -64,8 +97,23 @@ const StudyTimer = () => {
         setTimer(prev => {
           if (prev.seconds === 0) {
             if (prev.minutes === 0) {
-              // Timer finished
+              // Timer finished - auto switch mode
               const newIsBreak = !prev.isBreak;
+              const today = new Date().toISOString().split('T')[0];
+              
+              // Update stats if completing a focus session
+              if (newIsBreak) {
+                setStudyStats(prevStats => {
+                  const isNewDay = prevStats.lastStudyDate !== today;
+                  return {
+                    totalSessions: prevStats.totalSessions + 1,
+                    totalMinutes: prevStats.totalMinutes + 25,
+                    currentStreak: isNewDay ? (prevStats.currentStreak + 1) : prevStats.currentStreak,
+                    lastStudyDate: today
+                  };
+                });
+              }
+              
               toast({
                 title: newIsBreak ? "Session Complete! 🎉" : "Break Over! 💪",
                 description: newIsBreak ? "Time for a break" : "Ready to focus again",
