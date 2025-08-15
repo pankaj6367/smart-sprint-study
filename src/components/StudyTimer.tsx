@@ -34,7 +34,7 @@ const StudyTimer = () => {
   const [userProfile] = useLocalStorage('userProfile', null);
   const config = userProfile ? TIMER_CONFIGS[userProfile.studyLevel as keyof typeof TIMER_CONFIGS] || TIMER_CONFIGS['9-12'] : TIMER_CONFIGS['9-12'];
   
-  // Persistent timer state
+  // Persistent timer state - ensure it updates when config changes
   const [timer, setTimer] = useLocalStorage<TimerState>('studyTimer', {
     minutes: config.focus,
     seconds: 0,
@@ -42,6 +42,16 @@ const StudyTimer = () => {
     isBreak: false,
     sessionCount: 0
   });
+
+  // Update timer when config changes (user profile changes)
+  useEffect(() => {
+    if (!timer.isActive && timer.seconds === 0) {
+      setTimer(prev => ({
+        ...prev,
+        minutes: prev.isBreak ? config.break : config.focus
+      }));
+    }
+  }, [config, timer.isActive, timer.seconds, timer.isBreak, setTimer]);
 
   // Persistent study stats
   const [studyStats, setStudyStats] = useLocalStorage<StudyStats>('studyStats', {
@@ -153,7 +163,7 @@ const StudyTimer = () => {
     }
 
     return () => clearInterval(interval);
-  }, [timer.isActive, toast]);
+  }, [timer.isActive, toast, config, setStudyStats]);
 
   const maxTime = timer.isBreak ? 
     (timer.sessionCount > 0 && timer.sessionCount % 4 === 0 ? config.longBreak : config.break) : 
