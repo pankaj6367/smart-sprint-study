@@ -5,6 +5,13 @@ import { Play, Pause, RotateCcw, Coffee } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
+// Timer configurations for different study levels
+const TIMER_CONFIGS = {
+  '9-12': { focus: 25, break: 5, longBreak: 15 },
+  'NEET': { focus: 45, break: 10, longBreak: 30 },
+  'IIT-JEE': { focus: 50, break: 10, longBreak: 30 }
+};
+
 interface TimerState {
   minutes: number;
   seconds: number;
@@ -23,9 +30,13 @@ interface StudyStats {
 const StudyTimer = () => {
   const { toast } = useToast();
   
+  // Get user profile for timer configuration
+  const [userProfile] = useLocalStorage('userProfile', null);
+  const config = userProfile ? TIMER_CONFIGS[userProfile.studyLevel as keyof typeof TIMER_CONFIGS] || TIMER_CONFIGS['9-12'] : TIMER_CONFIGS['9-12'];
+  
   // Persistent timer state
   const [timer, setTimer] = useLocalStorage<TimerState>('studyTimer', {
-    minutes: 25,
+    minutes: config.focus,
     seconds: 0,
     isActive: false,
     isBreak: false,
@@ -47,11 +58,11 @@ const StudyTimer = () => {
   const resetTimer = useCallback(() => {
     setTimer(prev => ({
       ...prev,
-      minutes: prev.isBreak ? 5 : 25,
+      minutes: prev.isBreak ? config.break : config.focus,
       seconds: 0,
       isActive: false
     }));
-  }, []);
+  }, [config]);
 
   const toggleTimer = () => {
     setTimer(prev => ({ ...prev, isActive: !prev.isActive }));
@@ -60,11 +71,13 @@ const StudyTimer = () => {
   const switchMode = () => {
     const newIsBreak = !timer.isBreak;
     const today = new Date().toISOString().split('T')[0];
+    const isLongBreak = timer.sessionCount > 0 && (timer.sessionCount + 1) % 4 === 0;
+    const breakDuration = newIsBreak && isLongBreak ? config.longBreak : config.break;
     
     setTimer(prev => ({
       ...prev,
       isBreak: newIsBreak,
-      minutes: newIsBreak ? 5 : 25,
+      minutes: newIsBreak ? breakDuration : config.focus,
       seconds: 0,
       isActive: false,
       sessionCount: newIsBreak ? prev.sessionCount : prev.sessionCount + 1
@@ -76,16 +89,17 @@ const StudyTimer = () => {
         const isNewDay = prev.lastStudyDate !== today;
         return {
           totalSessions: prev.totalSessions + 1,
-          totalMinutes: prev.totalMinutes + 25,
+          totalMinutes: prev.totalMinutes + config.focus,
           currentStreak: isNewDay ? (prev.currentStreak + 1) : prev.currentStreak,
           lastStudyDate: today
         };
       });
     }
 
+    const breakType = newIsBreak && timer.sessionCount > 0 && (timer.sessionCount + 1) % 4 === 0 ? "Long Break!" : "Break";
     toast({
       title: newIsBreak ? "Session Complete! 🎉" : "Break Over! 💪",
-      description: newIsBreak ? "Great focus session! Take a break." : "Ready for another focused session",
+      description: newIsBreak ? `Great focus session! Take a ${breakType.toLowerCase()}.` : "Ready for another focused session",
     });
   };
 
@@ -100,6 +114,8 @@ const StudyTimer = () => {
               // Timer finished - auto switch mode
               const newIsBreak = !prev.isBreak;
               const today = new Date().toISOString().split('T')[0];
+              const isLongBreak = prev.sessionCount > 0 && (prev.sessionCount + 1) % 4 === 0;
+              const breakDuration = newIsBreak && isLongBreak ? config.longBreak : config.break;
               
               // Update stats if completing a focus session
               if (newIsBreak) {
@@ -107,21 +123,22 @@ const StudyTimer = () => {
                   const isNewDay = prevStats.lastStudyDate !== today;
                   return {
                     totalSessions: prevStats.totalSessions + 1,
-                    totalMinutes: prevStats.totalMinutes + 25,
+                    totalMinutes: prevStats.totalMinutes + config.focus,
                     currentStreak: isNewDay ? (prevStats.currentStreak + 1) : prevStats.currentStreak,
                     lastStudyDate: today
                   };
                 });
               }
               
+              const breakType = newIsBreak && isLongBreak ? "Long Break!" : "Break";
               toast({
                 title: newIsBreak ? "Session Complete! 🎉" : "Break Over! 💪",
-                description: newIsBreak ? "Time for a break" : "Ready to focus again",
+                description: newIsBreak ? `Time for a ${breakType.toLowerCase()}` : "Ready to focus again",
               });
               
               return {
                 ...prev,
-                minutes: newIsBreak ? 5 : 25,
+                minutes: newIsBreak ? breakDuration : config.focus,
                 seconds: 0,
                 isActive: false,
                 isBreak: newIsBreak,
@@ -138,9 +155,10 @@ const StudyTimer = () => {
     return () => clearInterval(interval);
   }, [timer.isActive, toast]);
 
-  const progress = timer.isBreak 
-    ? ((5 * 60 - (timer.minutes * 60 + timer.seconds)) / (5 * 60)) * 100
-    : ((25 * 60 - (timer.minutes * 60 + timer.seconds)) / (25 * 60)) * 100;
+  const maxTime = timer.isBreak ? 
+    (timer.sessionCount > 0 && timer.sessionCount % 4 === 0 ? config.longBreak : config.break) : 
+    config.focus;
+  const progress = ((maxTime * 60 - (timer.minutes * 60 + timer.seconds)) / (maxTime * 60)) * 100;
 
   return (
     <Card className="glass-card p-8 text-center max-w-md mx-auto">
@@ -152,7 +170,10 @@ const StudyTimer = () => {
             <div className="w-6 h-6 rounded-full bg-primary" />
           )}
           <span className="text-lg font-medium text-muted-foreground">
-            {timer.isBreak ? 'Break Time' : 'Focus Time'}
+            {timer.isBreak ? 
+              (timer.sessionCount > 0 && timer.sessionCount % 4 === 0 ? 'Long Break' : 'Break Time') : 
+              `Focus Time (${userProfile?.studyLevel || '9-12'})`
+            }
           </span>
         </div>
 
