@@ -4,10 +4,22 @@ import StudyStats from '@/components/StudyStats';
 import StudySchedule from '@/components/StudySchedule';
 import FocusTips from '@/components/FocusTips';
 import Navigation from '@/components/Navigation';
+import OnboardingForm from '@/components/OnboardingForm';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { GraduationCap } from 'lucide-react';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('timer');
+  const [userProfile, setUserProfile] = useLocalStorage('userProfile', null);
+
+  const handleOnboardingComplete = (data: any) => {
+    setUserProfile(data);
+  };
+
+  // Show onboarding if no user profile exists
+  if (!userProfile) {
+    return <OnboardingForm onComplete={handleOnboardingComplete} />;
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -35,10 +47,10 @@ const Index = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                Study Timer + Schedule
+                Welcome back, {userProfile.studentName}!
               </h1>
               <p className="text-muted-foreground">
-                Focus Better, Study Smarter
+                {userProfile.studyLevel} • Goal: {userProfile.dailyGoal}h daily
               </p>
             </div>
           </div>
